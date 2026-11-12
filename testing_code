@@ -1,0 +1,310 @@
+fn greet(name: &str) -> String {
+    format!("Hello, {name}!")
+}
+
+fn add(a: i32, b: i32) -> i32 {
+    a + b
+}
+
+fn subtract(a: i32, b: i32) -> i32 {
+    a - b
+}
+
+fn multiply(a: i32, b: i32) -> i32 {
+    a * b
+}
+
+fn divide(a: f64, b: f64) -> Option<f64> {
+    if b == 0.0 { None } else { Some(a / b) }
+}
+
+fn factorial(n: u64) -> u64 {
+    if n <= 1 { 1 } else { n * factorial(n - 1) }
+}
+
+fn is_even(n: i32) -> bool {
+    n % 2 == 0
+}
+
+fn count_words(text: &str) -> usize {
+    text.split_whitespace().count()
+}
+
+fn reverse_string(text: &str) -> String {
+    text.chars().rev().collect()
+}
+
+fn find_max(numbers: &[i32]) -> Option<i32> {
+    numbers.iter().copied().max()
+}
+
+fn identity<T>(value: T) -> T {
+    value
+}
+
+fn longest<'a>(a: &'a str, b: &'a str) -> &'a str {
+    if a.len() > b.len() { a } else { b }
+}
+
+fn print_message() {
+    println!("Standalone function");
+}
+
+fn calculate_average(numbers: &[f64]) -> Option<f64> {
+    if numbers.is_empty() {
+        None
+    } else {
+        Some(numbers.iter().sum::<f64>() / numbers.len() as f64)
+    }
+}
+
+fn merge_vectors<T: Clone>(a: &[T], b: &[T]) -> Vec<T> {
+    a.iter().chain(b).cloned().collect()
+}
+
+// ==========================================
+// USER STRUCT
+// ==========================================
+
+struct User {
+    username: String,
+    email: String,
+    age: u32,
+}
+
+impl User {
+    // Associated functions
+
+    fn new(username: String, email: String, age: u32) -> Self {
+        Self { username, email, age }
+    }
+
+    fn guest() -> Self {
+        Self::new("Guest".into(), "guest@example.com".into(), 18)
+    }
+
+    fn anonymous() -> Self {
+        Self::new("Anonymous".into(), "".into(), 0)
+    }
+
+    // Methods
+
+    fn get_username(&self) -> &str {
+        &self.username
+    }
+
+    fn update_email(&mut self, email: String) {
+        self.email = email;
+    }
+
+    fn is_adult(&self) -> bool {
+        self.age >= 18
+    }
+
+    fn display(&self) {
+        println!("{} ({})", self.username, self.email);
+    }
+
+    fn change_username(&mut self, username: String) {
+        self.username = username;
+    }
+
+    fn consume(self) -> String {
+        self.username
+    }
+}
+
+// ==========================================
+// CALCULATOR STRUCT
+// ==========================================
+
+struct Calculator {
+    value: f64,
+}
+
+impl Calculator {
+    // Associated functions
+
+    fn new() -> Self {
+        Self { value: 0.0 }
+    }
+
+    fn from_value(value: f64) -> Self {
+        Self { value }
+    }
+
+    fn zero() -> Self {
+        Self::new()
+    }
+
+    // Methods
+
+    fn add(&mut self, n: f64) {
+        self.value += n;
+    }
+
+    fn subtract(&mut self, n: f64) {
+        self.value -= n;
+    }
+
+    fn multiply(&mut self, n: f64) {
+        self.value *= n;
+    }
+
+    fn divide(&mut self, n: f64) {
+        self.value /= n;
+    }
+
+    fn result(&self) -> f64 {
+        self.value
+    }
+
+    fn reset(&mut self) {
+        self.value = 0.0;
+    }
+}
+
+// ==========================================
+// GENERIC CONTAINER STRUCT
+// ==========================================
+
+struct Container<T> {
+    items: Vec<T>,
+}
+
+impl<T> Container<T> {
+    // Associated functions
+
+    fn new() -> Self {
+        Self { items: Vec::new() }
+    }
+
+    fn with_capacity(capacity: usize) -> Self {
+        Self {
+            items: Vec::with_capacity(capacity),
+        }
+    }
+
+    // Methods
+
+    fn push(&mut self, item: T) {
+        self.items.push(item);
+    }
+
+    fn len(&self) -> usize {
+        self.items.len()
+    }
+
+    fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+
+    fn clear(&mut self) {
+        self.items.clear();
+    }
+
+    fn pop(&mut self) -> Option<T> {
+        self.items.pop()
+    }
+}
+
+// ==========================================
+// BOOKSTORE STRUCT
+// ==========================================
+
+struct Book {
+    title: String,
+    author: String,
+    price: f64,
+}
+
+struct Bookstore {
+    books: Vec<Book>,
+}
+
+impl Bookstore {
+    // Associated functions
+
+    fn new() -> Self {
+        Self { books: Vec::new() }
+    }
+
+    fn empty() -> Self {
+        Self::new()
+    }
+
+    // Methods
+
+    fn add_book(&mut self, book: Book) {
+        self.books.push(book);
+    }
+
+    fn remove_book(&mut self, title: &str) {
+        self.books.retain(|book| book.title != title);
+    }
+
+    fn book_count(&self) -> usize {
+        self.books.len()
+    }
+
+    fn total_value(&self) -> f64 {
+        self.books.iter().map(|book| book.price).sum()
+    }
+
+    fn find_book(&self, title: &str) -> Option<&Book> {
+        self.books.iter().find(|book| book.title == title)
+    }
+
+    fn clear_books(&mut self) {
+        self.books.clear();
+    }
+}
+
+// ==========================================
+// MATH STRUCT
+// ==========================================
+
+struct Math;
+
+impl Math {
+    // All associated functions (no self receiver)
+
+    fn square(n: i32) -> i32 {
+        n * n
+    }
+
+    fn cube(n: i32) -> i32 {
+        n * n * n
+    }
+
+    fn absolute(n: i32) -> i32 {
+        n.abs()
+    }
+
+    fn max(a: i32, b: i32) -> i32 {
+        a.max(b)
+    }
+}
+
+// ==========================================
+// MAIN
+// ==========================================
+
+fn main() {
+    let user = User::guest();
+    user.display();
+
+    let mut calculator = Calculator::new();
+    calculator.add(10.0);
+    calculator.multiply(2.0);
+
+    println!("Result: {}", calculator.result());
+
+    let mut container = Container::new();
+    container.push(10);
+    container.push(20);
+
+    println!("Container length: {}", container.len());
+
+    println!("Square: {}", Math::square(5));
+}

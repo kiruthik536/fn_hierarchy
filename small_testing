@@ -1,0 +1,19 @@
+
+struct hello{
+    name:String,
+}
+
+impl hello{
+    fn hi(self){
+        println!("kjdsfb");
+    }
+
+    fn h(){
+        println!("df;lhgjl;");
+    }
+}
+
+fn main(){
+    
+}
+

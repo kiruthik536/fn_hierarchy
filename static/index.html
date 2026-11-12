@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#1f2023">
+<title>Rust Online Compiler & Function Hierarchy</title>
+<style>
+  :root {
+    --bg:#1f2023; --panel:#26282c; --bar:#1f2023; --border:#3a3d42;
+    --fg:#e6e6e6; --muted:#9aa0a6; --gutter:#7d8187; --accent:#4f8cff;
+    --run:#2f7bf5; --run-fg:#fff; --danger:#ff6b6b; --hover:#33363b;
+  }
+  :root[data-theme="light"] {
+    --bg:#ffffff; --panel:#f7f8fa; --bar:#ffffff; --border:#dcdfe4;
+    --fg:#1d1f23; --muted:#666c75; --gutter:#9aa0a8; --accent:#2f6fe4;
+    --run:#2f6fe4; --run-fg:#fff; --danger:#d12f2f; --hover:#eceef2;
+  }
+  * { box-sizing:border-box; }
+  html, body { height:100%; margin:0; }
+  body { display:flex; flex-direction:column; background:var(--bg); color:var(--fg);
+         font-family:system-ui,-apple-system,"Segoe UI",sans-serif; font-size:14px; }
+
+  /* top bar */
+  header { display:flex; align-items:center; justify-content:space-between; height:52px;
+           padding:0 16px; background:var(--bar); border-bottom:1px solid var(--border); flex:none; }
+  .brand { display:flex; align-items:center; gap:10px; font-weight:700; font-size:16px; }
+  .logo { width:26px; height:26px; border-radius:6px; background:var(--accent); color:#fff;
+          display:grid; place-items:center; font-size:14px; font-weight:800; }
+  .menu { position:relative; }
+  .icon-btn { background:none; border:1px solid transparent; color:var(--fg); border-radius:6px;
+              width:34px; height:34px; cursor:pointer; font-size:18px; line-height:1; }
+  .icon-btn:hover { background:var(--hover); }
+  .dropdown { display:none; position:absolute; right:0; top:40px; min-width:170px; z-index:20;
+              background:var(--panel); border:1px solid var(--border); border-radius:8px;
+              padding:4px; box-shadow:0 8px 24px rgba(0,0,0,.35); }
+  .dropdown.open { display:block; }
+  .dropdown button { display:block; width:100%; text-align:left; background:none; border:0;
+                     color:var(--fg); padding:9px 12px; border-radius:6px; cursor:pointer; font-size:14px; }
+  .dropdown button:hover { background:var(--hover); }
+
+  /* split layout */
+  main { flex:1; min-height:0; display:grid; grid-template-columns:1fr 1fr; }
+  .pane { display:flex; flex-direction:column; min-width:0; min-height:0; }
+  .pane + .pane { border-left:1px solid var(--border); }
+  .tabbar { display:flex; align-items:center; justify-content:space-between; height:44px; flex:none;
+            padding:0 8px 0 0; background:var(--panel); border-bottom:1px solid var(--border); }
+  .tabs { display:flex; height:100%; }
+  .tab { display:flex; align-items:center; padding:0 18px; height:100%; background:none; border:0;
+         color:var(--muted); cursor:pointer; font-size:14px; border-bottom:2px solid transparent; }
+  .tab.active { color:var(--fg); border-bottom-color:var(--accent); background:var(--bg); }
+  .actions { display:flex; gap:8px; align-items:center; }
+  .btn { padding:6px 16px; border-radius:6px; cursor:pointer; font-size:14px;
+         background:none; color:var(--fg); border:1px solid var(--border); }
+  .btn:hover { background:var(--hover); }
+  .btn.run { background:var(--run); color:var(--run-fg); border-color:var(--run); font-weight:600; }
+  .btn.run:hover { filter:brightness(1.1); }
+  .btn.run:disabled { opacity:.6; cursor:wait; }
+  .btn.small { padding:3px 10px; font-size:12px; }
+
+  /* editor */
+  .editor { flex:1; min-height:0; display:flex; background:var(--bg); }
+  #gutter { flex:none; width:48px; padding:12px 8px 12px 0; text-align:right; overflow:hidden;
+            color:var(--gutter); user-select:none; white-space:pre; border-right:1px solid var(--border);
+            font:14px/20px ui-monospace,"SF Mono",Menlo,Consolas,monospace; }
+  #code { flex:1; min-width:0; resize:none; border:0; outline:0; padding:12px; white-space:pre; overflow:auto;
+          background:transparent; color:var(--fg); tab-size:4;
+          font:14px/20px ui-monospace,"SF Mono",Menlo,Consolas,monospace; }
+
+  /* output pane */
+  .view { flex:1; min-height:0; overflow:auto; padding:14px 16px; background:var(--bg); }
+  .view[hidden] { display:none; }
+  pre#out { margin:0; white-space:pre-wrap; word-break:break-word;
+            font:14px/1.5 ui-monospace,"SF Mono",Menlo,Consolas,monospace; }
+  pre#out.fail { color:var(--danger); }
+  #parseError { color:var(--danger); white-space:pre-wrap; margin-bottom:10px; }
+  .placeholder { color:var(--muted); }
+
+  /* hierarchy tree */
+  h3 { margin:18px 0 6px; font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
+  h3:first-child { margin-top:0; }
+  ul { list-style:none; margin:0; padding-left:20px; border-left:1px solid var(--border); }
+  #tree > section > ul { border-left:none; padding-left:0; }
+  summary, .leaf { padding:3px 0; }
+  summary { cursor:pointer; }
+  .leaf { padding-left:14px; }
+  code { font:13px ui-monospace,"SF Mono",Menlo,Consolas,monospace; }
+  .ret { color:var(--muted); }
+  .badge { font-size:11px; padding:1px 7px; border-radius:8px; margin-right:6px; color:#fff; }
+  .standalone { background:#3b82f6; } .method { background:#10b981; } .associated { background:#f59e0b; }
+  .rec { font-size:11px; color:#d97706; margin-left:6px; }
+
+  /* restore dialog */
+  dialog { background:var(--panel); color:var(--fg); border:1px solid var(--border); border-radius:10px;
+           padding:18px; width:min(520px,92vw); }
+  dialog::backdrop { background:rgba(0,0,0,.5); }
+  dialog h2 { margin:0 0 4px; font-size:17px; }
+  dialog p { margin:0 0 12px; color:var(--muted); }
+  .saved { display:block; width:100%; text-align:left; margin-bottom:8px; padding:10px; cursor:pointer;
+           background:var(--bg); color:var(--fg); border:1px solid var(--border); border-radius:6px;
+           font:12px/1.4 ui-monospace,Menlo,Consolas,monospace; white-space:pre; overflow:hidden;
+           text-overflow:ellipsis; max-height:64px; }
+  .saved:hover { border-color:var(--accent); }
+
+  @media (max-width: 800px) {
+    main { grid-template-columns:1fr; grid-template-rows:1fr 1fr; }
+    .pane + .pane { border-left:0; border-top:1px solid var(--border); }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand"><span class="logo">fn</span> Rust Online Compiler</div>
+  <div class="menu">
+    <button class="icon-btn" id="menuBtn" title="Menu">&#8942;</button>
+    <div class="dropdown" id="dropdown">
+      <button id="themeBtn">Light mode</button>
+      <button id="restoreBtn">Restore code</button>
+      <button id="downloadBtn">Download</button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <!-- left: editor -->
+  <section class="pane">
+    <div class="tabbar">
+      <div class="tabs"><button class="tab active">main.rs</button></div>
+      <div class="actions">
+        <button class="btn" id="clear">Clear</button>
+        <button class="btn run" id="run">Run</button>
+      </div>
+    </div>
+    <div class="editor">
+      <div id="gutter">1</div>
+      <textarea id="code" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
+    </div>
+  </section>
+
+  <!-- right: output + hierarchy -->
+  <section class="pane">
+    <div class="tabbar">
+      <div class="tabs">
+        <button class="tab active" id="tabOut">Output</button>
+        <button class="tab" id="tabTree">Hierarchy</button>
+      </div>
+      <div class="actions" id="treeActions" hidden>
+        <button class="btn small" id="expand">Expand all</button>
+        <button class="btn small" id="collapse">Collapse all</button>
+      </div>
+    </div>
+    <div class="view" id="viewOut">
+      <pre id="out" class="placeholder">Click Run to compile and run your code.</pre>
+    </div>
+    <div class="view" id="viewTree" hidden>
+      <div id="parseError"></div>
+      <div id="tree"><span class="placeholder">Click Run to build the function hierarchy.</span></div>
+    </div>
+  </section>
+</main>
+
+<dialog id="restoreDlg">
+  <h2>Restore code</h2>
+  <p>Your last three programs are saved in this browser.</p>
+  <div id="savedList"></div>
+  <button class="btn" id="closeDlg">Close</button>
+</dialog>
+
+<script>
+const $ = id => document.getElementById(id);
+
+const SAMPLE = `// Online Rust compiler
+// Write and run Rust here, then open the Hierarchy tab.
+
+struct Store {
+    items: Vec<String>,
+}
+
+impl Store {
+    fn new() -> Self {
+        Self { items: Vec::new() }
+    }
+
+    fn add(&mut self, key: String) -> usize {
+        let label = format_key(&key);
+        self.items.push(label);
+        self.count()
+    }
+
+    fn count(&self) -> usize {
+        self.items.len()
+    }
+}
+
+fn format_key(key: &str) -> String {
+    key.to_uppercase()
+}
+
+fn main() {
+    let mut s = Store::new();
+    let n = s.add("hello".to_string());
+    println!("Items: {}", n);
+}
+`;
+
+/* ---------- storage helpers (safe if storage is blocked) ---------- */
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch {} },
+};
+
+/* ---------- theme ---------- */
+function setTheme(t) {
+  document.documentElement.dataset.theme = t;
+  $("themeBtn").textContent = t === "dark" ? "Light mode" : "Dark mode";
+  store.set("theme", t);
+}
+setTheme(store.get("theme") || "dark");
+$("themeBtn").onclick = () => {
+  setTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
+  closeMenu();
+};
+
+/* ---------- menu ---------- */
+const closeMenu = () => $("dropdown").classList.remove("open");
+$("menuBtn").onclick = e => { e.stopPropagation(); $("dropdown").classList.toggle("open"); };
+document.addEventListener("click", closeMenu);
+
+/* ---------- editor: line numbers, tab key, shortcuts ---------- */
+const code = $("code");
+function updateGutter() {
+  const n = code.value.split("\n").length;
+  let s = "";
+  for (let i = 1; i <= n; i++) s += i + "\n";
+  $("gutter").textContent = s;
+  $("gutter").scrollTop = code.scrollTop;
+}
+code.addEventListener("input", updateGutter);
+code.addEventListener("scroll", () => { $("gutter").scrollTop = code.scrollTop; });
+code.addEventListener("keydown", e => {
+  if (e.key === "Tab") {
+    e.preventDefault();
+    const s = code.selectionStart, end = code.selectionEnd;
+    code.value = code.value.slice(0, s) + "    " + code.value.slice(end);
+    code.selectionStart = code.selectionEnd = s + 4;
+    updateGutter();
+  } else if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+    e.preventDefault();
+    runCode();
+  }
+});
+code.value = store.get("draft") || SAMPLE;
+updateGutter();
+code.addEventListener("input", () => store.set("draft", code.value));
+
+$("clear").onclick = () => { code.value = ""; store.set("draft", ""); updateGutter(); code.focus(); };
+
+/* ---------- tabs ---------- */
+function showTab(name) {
+  const tree = name === "tree";
+  $("tabOut").classList.toggle("active", !tree);
+  $("tabTree").classList.toggle("active", tree);
+  $("viewOut").hidden = tree;
+  $("viewTree").hidden = !tree;
+  $("treeActions").hidden = !tree;
+}
+$("tabOut").onclick = () => showTab("out");
+$("tabTree").onclick = () => showTab("tree");
+$("expand").onclick = () => document.querySelectorAll("details").forEach(d => d.open = true);
+$("collapse").onclick = () => document.querySelectorAll("details").forEach(d => d.open = false);
+
+/* ---------- download / restore ---------- */
+$("downloadBtn").onclick = () => {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([code.value], { type: "text/plain" }));
+  a.download = "main.rs";
+  a.click();
+  URL.revokeObjectURL(a.href);
+  closeMenu();
+};
+
+function loadSaved() {
+  try { return JSON.parse(store.get("history") || "[]"); } catch { return []; }
+}
+function saveToHistory(src) {
+  if (!src.trim()) return;
+  const list = loadSaved().filter(s => s !== src);
+  list.unshift(src);
+  store.set("history", JSON.stringify(list.slice(0, 3)));
+}
+$("restoreBtn").onclick = () => {
+  closeMenu();
+  const list = loadSaved();
+  const box = $("savedList");
+  box.textContent = "";
+  if (!list.length) {
+    const p = document.createElement("p");
+    p.textContent = "Nothing saved yet. Programs are saved when you click Run.";
+    box.append(p);
+  }
+  for (const src of list) {
+    const b = document.createElement("button");
+    b.className = "saved";
+    b.textContent = src;
+    b.onclick = () => { code.value = src; store.set("draft", src); updateGutter(); $("restoreDlg").close(); };
+    box.append(b);
+  }
+  $("restoreDlg").showModal();
+};
+$("closeDlg").onclick = () => $("restoreDlg").close();
+
+/* ---------- run ---------- */
+$("run").onclick = runCode;
+
+async function runCode() {
+  const btn = $("run");
+  btn.disabled = true;
+  btn.textContent = "Running...";
+  saveToHistory(code.value);
+
+  const out = $("out");
+  out.className = "placeholder";
+  out.textContent = "Compiling and running...";
+  showTab("out");
+  $("parseError").textContent = "";
+
+  try {
+    const res = await fetch("/run", { method: "POST", body: code.value });
+    if (!res.ok) { out.className = "fail"; out.textContent = await res.text(); return; }
+    const data = await res.json();
+
+    if (data.run_error) {
+      out.className = "fail";
+      out.textContent = data.run_error;
+    } else {
+      const r = data.run;
+      out.className = r.success ? "" : "fail";
+      out.textContent = (r.stdout || "") + (r.stderr ? (r.stdout ? "\n" : "") + r.stderr : "") || "(no output)";
+    }
+
+    $("parseError").textContent = data.parse_error || "";
+    $("tree").textContent = "";
+    if (data.hierarchy) draw(data.hierarchy);
+  } catch (e) {
+    out.className = "fail";
+    out.textContent = "Request failed: " + e.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Run";
+  }
+}
+
+/* ---------- hierarchy tree ---------- */
+function draw(data) {
+  const byId = new Map(data.functions.map(f => [f.id, f]));
+  const shown = new Set();
+
+  const isMain = f => f.name === "main" && f.owner === null;
+  const entry = data.roots.map(i => byId.get(i)).filter(isMain);
+  const unused = data.roots.map(i => byId.get(i)).filter(f => !isMain(f));
+
+  if (!data.functions.length) {
+    const p = document.createElement("span");
+    p.className = "placeholder";
+    p.textContent = "No functions found.";
+    $("tree").append(p);
+    return;
+  }
+
+  section("Entry point", entry);
+  section("Not called by anything", unused);
+  const rest = data.functions.filter(f => !shown.has(f.id));
+  section("Only reachable through a call cycle", rest);
+
+  function section(title, fns) {
+    if (!fns.length) return;
+    const sec = document.createElement("section");
+    const h = document.createElement("h3");
+    h.textContent = title;
+    const ul = document.createElement("ul");
+    for (const f of fns) {
+      if (shown.has(f.id) && title.startsWith("Only")) continue;
+      ul.append(node(f, new Set()));
+    }
+    sec.append(h, ul);
+    $("tree").append(sec);
+  }
+
+  function node(f, path) {
+    shown.add(f.id);
+    const li = document.createElement("li");
+    const recursive = path.has(f.id);
+    const kids = recursive ? [] : f.calls.map(id => byId.get(id));
+
+    const head = document.createElement(kids.length ? "summary" : "div");
+    if (!kids.length) head.className = "leaf";
+    head.append(label(f));
+    if (recursive) {
+      const r = document.createElement("span");
+      r.className = "rec"; r.textContent = "\u21bb recursive";
+      head.append(r);
+    }
+
+    if (kids.length) {
+      const d = document.createElement("details");
+      d.open = path.size === 0;
+      const ul = document.createElement("ul");
+      const next = new Set(path).add(f.id);
+      for (const k of kids) ul.append(node(k, next));
+      d.append(head, ul);
+      li.append(d);
+    } else {
+      li.append(head);
+    }
+    return li;
+  }
+
+  function label(f) {
+    const wrap = document.createElement("span");
+    const b = document.createElement("span");
+    b.className = "badge " + f.kind; b.textContent = f.kind;
+    const c = document.createElement("code");
+    const params = f.params.map(p => p.name === "self" ? p.ty : `${p.name}: ${p.ty}`).join(", ");
+    c.textContent = (f.owner ? f.owner + "::" : "") + f.name + "(" + params + ")";
+    wrap.append(b, c);
+    if (f.return_type) {
+      const r = document.createElement("code");
+      r.className = "ret"; r.textContent = " \u2192 " + f.return_type;
+      wrap.append(r);
+    }
+    return wrap;
+  }
+}
+</script>
+</body>
+</html>
