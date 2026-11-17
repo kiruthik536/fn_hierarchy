@@ -1,436 +1,660 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#1f2023">
+<link rel="icon" href="data:image/svg+xml,*<*&#x73;vg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22>*<*&#x74;ext y=%22.9em%22 font-size=%2290%22>&#8767;*<*/text>*<*/svg>">
 <title>Rust Online Compiler & Function Hierarchy</title>
 <style>
-  :root {
-    --bg:#1f2023; --panel:#26282c; --bar:#1f2023; --border:#3a3d42;
-    --fg:#e6e6e6; --muted:#9aa0a6; --gutter:#7d8187; --accent:#4f8cff;
-    --run:#2f7bf5; --run-fg:#fff; --danger:#ff6b6b; --hover:#33363b;
-  }
-  :root[data-theme="light"] {
-    --bg:#ffffff; --panel:#f7f8fa; --bar:#ffffff; --border:#dcdfe4;
-    --fg:#1d1f23; --muted:#666c75; --gutter:#9aa0a8; --accent:#2f6fe4;
-    --run:#2f6fe4; --run-fg:#fff; --danger:#d12f2f; --hover:#eceef2;
-  }
-  * { box-sizing:border-box; }
-  html, body { height:100%; margin:0; }
-  body { display:flex; flex-direction:column; background:var(--bg); color:var(--fg);
-         font-family:system-ui,-apple-system,"Segoe UI",sans-serif; font-size:14px; }
+:root {
+--bg:#1f2023; --panel:#26282c; --bar:#1f2023; --border:#3a3d42;
+--fg:#e6e6e6; --muted:#9aa0a6; --gutter:#7d8187; --accent:#4f8cff;
+--run:#2f7bf5; --run-fg:#fff; --danger:#ff6b6b; --hover:#33363b;
+--c-kw:#c586c0; --c-str:#ce9178; --c-com:#6a9955; --c-num:#b5cea8;
+--c-type:#4ec9b0; --c-fn:#dcdcaa; --c-mac:#4fc1ff; --c-attr:#9cdcfe; --c-life:#d7ba7d;
+--sel:rgba(79,140,255,.35);
+}
+:root[data-theme="light"] {
+--bg:#ffffff; --panel:#f7f8fa; --bar:#ffffff; --border:#dcdfe4;
+--fg:#1d1f23; --muted:#666c75; --gutter:#9aa0a8; --accent:#2f6fe4;
+--run:#2f6fe4; --run-fg:#fff; --danger:#d12f2f; --hover:#eceef2;
+--c-kw:#af00db; --c-str:#a31515; --c-com:#008000; --c-num:#098658;
+--c-type:#267f99; --c-fn:#795e26; --c-mac:#0070c1; --c-attr:#001080; --c-life:#a15c00;
+--sel:rgba(47,111,228,.25);
+}
+* { box-sizing:border-box; }
+html, body { height:100%; margin:0; }
+body { display:flex; flex-direction:column; background:var(--bg); color:var(--fg); font-family:system-ui,-apple-system,"Segoe UI",sans-serif; font-size:14px; }
 
-  /* top bar */
-  header { display:flex; align-items:center; justify-content:space-between; height:52px;
-           padding:0 16px; background:var(--bar); border-bottom:1px solid var(--border); flex:none; }
-  .brand { display:flex; align-items:center; gap:10px; font-weight:700; font-size:16px; }
-  .logo { width:26px; height:26px; border-radius:6px; background:var(--accent); color:#fff;
-          display:grid; place-items:center; font-size:14px; font-weight:800; }
-  .menu { position:relative; }
-  .icon-btn { background:none; border:1px solid transparent; color:var(--fg); border-radius:6px;
-              width:34px; height:34px; cursor:pointer; font-size:18px; line-height:1; }
-  .icon-btn:hover { background:var(--hover); }
-  .dropdown { display:none; position:absolute; right:0; top:40px; min-width:170px; z-index:20;
-              background:var(--panel); border:1px solid var(--border); border-radius:8px;
-              padding:4px; box-shadow:0 8px 24px rgba(0,0,0,.35); }
-  .dropdown.open { display:block; }
-  .dropdown button { display:block; width:100%; text-align:left; background:none; border:0;
-                     color:var(--fg); padding:9px 12px; border-radius:6px; cursor:pointer; font-size:14px; }
-  .dropdown button:hover { background:var(--hover); }
+header { display:flex; align-items:center; gap:14px; height:64px; padding:0 16px; background:var(--bar); border-bottom:1px solid var(--border); flex:none; }
+.brand { display:flex; align-items:center; gap:10px; font-weight:700; font-size:16px; white-space:nowrap; cursor:default; }
+.menu { position:relative; flex:none; }
+.icon-btn { background:none; border:1px solid transparent; color:var(--fg); border-radius:6px; width:34px; height:34px; cursor:pointer; font-size:18px; line-height:1; }
+.icon-btn:hover { background:var(--hover); }
+.dropdown { display:none; position:absolute; right:0; top:40px; min-width:170px; z-index:20; background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:4px; box-shadow:0 8px 24px rgba(0,0,0,.35); }
+.dropdown.open { display:block; }
+.dropdown button { display:block; width:100%; text-align:left; background:none; border:0; color:var(--fg); padding:9px 12px; border-radius:6px; cursor:pointer; font-size:14px; }
+.dropdown button:hover { background:var(--hover); }
 
-  /* split layout */
-  main { flex:1; min-height:0; display:grid; grid-template-columns:1fr 1fr; }
-  .pane { display:flex; flex-direction:column; min-width:0; min-height:0; }
-  .pane + .pane { border-left:1px solid var(--border); }
-  .tabbar { display:flex; align-items:center; justify-content:space-between; height:44px; flex:none;
-            padding:0 8px 0 0; background:var(--panel); border-bottom:1px solid var(--border); }
-  .tabs { display:flex; height:100%; }
-  .tab { display:flex; align-items:center; padding:0 18px; height:100%; background:none; border:0;
-         color:var(--muted); cursor:pointer; font-size:14px; border-bottom:2px solid transparent; }
-  .tab.active { color:var(--fg); border-bottom-color:var(--accent); background:var(--bg); }
-  .actions { display:flex; gap:8px; align-items:center; }
-  .btn { padding:6px 16px; border-radius:6px; cursor:pointer; font-size:14px;
-         background:none; color:var(--fg); border:1px solid var(--border); }
-  .btn:hover { background:var(--hover); }
-  .btn.run { background:var(--run); color:var(--run-fg); border-color:var(--run); font-weight:600; }
-  .btn.run:hover { filter:brightness(1.1); }
-  .btn.run:disabled { opacity:.6; cursor:wait; }
-  .btn.small { padding:3px 10px; font-size:12px; }
+/* Flowing wave */
+.hero { flex:1; min-width:0; height:100%; overflow:hidden; display:flex; align-items:center; opacity:.96; }
+.wave-art { display:block; width:100%; height:100%; min-width:260px; overflow:visible; }
+.wave-line { fill:none; stroke-linecap:round; stroke-linejoin:round; }
+.wave-main { stroke:url(#waveGradient); stroke-width:2.4; filter:url(#waveGlow); stroke-dasharray:18 10; animation:waveFlow 8s linear infinite; }
+.wave-second { stroke:#087fc4; stroke-width:1.6; opacity:.8; stroke-dasharray:12 13; animation:waveFlowReverse 11s linear infinite; }
+.wave-fine { stroke:#1aa9cf; stroke-width:.8; opacity:.38; stroke-dasharray:5 12; animation:waveFlow 14s linear infinite; }
+.wave-soft { stroke:#1764b5; stroke-width:1.2; opacity:.55; stroke-dasharray:20 16; animation:waveFlowReverse 17s linear infinite; }
+@keyframes waveFlow { to { stroke-dashoffset:-280px; } }
+@keyframes waveFlowReverse { to { stroke-dashoffset:280px; } }
 
-  /* editor */
-  .editor { flex:1; min-height:0; display:flex; background:var(--bg); }
-  #gutter { flex:none; width:48px; padding:12px 8px 12px 0; text-align:right; overflow:hidden;
-            color:var(--gutter); user-select:none; white-space:pre; border-right:1px solid var(--border);
-            font:14px/20px ui-monospace,"SF Mono",Menlo,Consolas,monospace; }
-  #code { flex:1; min-width:0; resize:none; border:0; outline:0; padding:12px; white-space:pre; overflow:auto;
-          background:transparent; color:var(--fg); tab-size:4;
-          font:14px/20px ui-monospace,"SF Mono",Menlo,Consolas,monospace; }
+/* Resizable split layout */
+main { flex:1; min-height:0; display:grid; grid-template-columns:minmax(260px,var(--left-pane, 1fr)) 8px minmax(260px,1fr); }
+.splitter { position:relative; z-index:5; cursor:col-resize; background:var(--border); touch-action:none; }
+.splitter::after { content:""; position:absolute; width:3px; height:42px; left:50%; top:50%; transform:translate(-50%,-50%); border-radius:4px; background:var(--muted); opacity:.7; }
+.splitter:hover, .splitter.dragging { background:var(--accent); }
+.splitter:hover::after, .splitter.dragging::after { background:white; opacity:1; }
+body.resizing { cursor:col-resize; user-select:none; }
+.pane { display:flex; flex-direction:column; min-width:0; min-height:0; }
+.pane + .pane { border-left:1px solid var(--border); }
+.tabbar { display:flex; align-items:center; justify-content:space-between; height:44px; flex:none; padding:0 8px 0 0; background:var(--panel); border-bottom:1px solid var(--border); }
+.tabs { display:flex; height:100%; }
+.tab { display:flex; align-items:center; padding:0 18px; height:100%; background:none; border:0; color:var(--muted); cursor:pointer; font-size:14px; border-bottom:2px solid transparent; transition:color .15s, background .15s; }
+.tab:hover { color:var(--fg); }
+.tab.active { color:var(--fg); border-bottom-color:var(--accent); background:var(--bg); }
+.actions { display:flex; gap:8px; align-items:center; }
+.btn { padding:6px 16px; border-radius:6px; cursor:pointer; font-size:14px; background:none; color:var(--fg); border:1px solid var(--border); transition:transform .15s, filter .15s, background .15s; }
+.btn:hover { background:var(--hover); }
+.btn.run { background:var(--run); color:var(--run-fg); border-color:var(--run); font-weight:600; }
+.btn.run:hover { filter:brightness(1.1); transform:translateY(-1px); }
+.btn.run:disabled { opacity:.75; cursor:wait; transform:none; }
+.btn.run:disabled::before { content:""; display:inline-block; width:10px; height:10px; margin-right:8px; border:2px solid rgba(255,255,255,.45); border-top-color:#fff; border-radius:50%; animation:spin .7s linear infinite; vertical-align:-1px; }
+@keyframes spin { to { transform:rotate(360deg); } }
+.btn.small { padding:3px 10px; font-size:12px; }
 
-  /* output pane */
-  .view { flex:1; min-height:0; overflow:auto; padding:14px 16px; background:var(--bg); }
-  .view[hidden] { display:none; }
-  pre#out { margin:0; white-space:pre-wrap; word-break:break-word;
-            font:14px/1.5 ui-monospace,"SF Mono",Menlo,Consolas,monospace; }
-  pre#out.fail { color:var(--danger); }
-  #parseError { color:var(--danger); white-space:pre-wrap; margin-bottom:10px; }
-  .placeholder { color:var(--muted); }
+/* Editor */
+.editor { flex:1; min-height:0; display:flex; background:var(--bg); }
+#gutter { flex:none; width:48px; padding:12px 8px 12px 0; text-align:right; overflow:hidden; color:var(--gutter); user-select:none; white-space:pre; border-right:1px solid var(--border); font-family:var(--editor-font, ui-monospace,"SF Mono",Menlo,Consolas,monospace); font-size:var(--editor-size,14px); line-height:var(--editor-line,20px); }
+.codewrap { position:relative; flex:1; min-width:0; overflow:hidden; }
+#hl, #code { position:absolute; inset:0; margin:0; border:0; width:100%; height:100%; font-family:var(--editor-font, ui-monospace,"SF Mono",Menlo,Consolas,monospace); font-size:var(--editor-size,14px); line-height:var(--editor-line,20px); letter-spacing:normal; word-spacing:normal; tab-size:4; white-space:pre; overflow-wrap:normal; word-wrap:normal; }
+#hl { padding:12px 32px 32px 12px; overflow:hidden; pointer-events:none; color:var(--fg); }
+#code { padding:12px; resize:none; outline:0; overflow:auto; background:transparent; color:transparent; caret-color:var(--fg); }
+#code::selection { background:var(--sel); color:transparent; }
+.t-kw { color:var(--c-kw); } .t-str { color:var(--c-str); } .t-com { color:var(--c-com); font-style:italic; }
+.t-num { color:var(--c-num); } .t-type { color:var(--c-type); } .t-fn { color:var(--c-fn); }
+.t-mac { color:var(--c-mac); } .t-attr { color:var(--c-attr); } .t-life { color:var(--c-life); }
+.editor-tools { gap:6px; }
+.font-label { color:var(--muted); font-size:12px; }
+.font-select { max-width:125px; padding:5px 7px; color:var(--fg); background:var(--bg); border:1px solid var(--border); border-radius:6px; font-size:12px; }
+.font-select:focus { outline:1px solid var(--accent); }
 
-  /* hierarchy tree */
-  h3 { margin:18px 0 6px; font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
-  h3:first-child { margin-top:0; }
-  ul { list-style:none; margin:0; padding-left:20px; border-left:1px solid var(--border); }
-  #tree > section > ul { border-left:none; padding-left:0; }
-  summary, .leaf { padding:3px 0; }
-  summary { cursor:pointer; }
-  .leaf { padding-left:14px; }
-  code { font:13px ui-monospace,"SF Mono",Menlo,Consolas,monospace; }
-  .ret { color:var(--muted); }
-  .badge { font-size:11px; padding:1px 7px; border-radius:8px; margin-right:6px; color:#fff; }
-  .standalone { background:#3b82f6; } .method { background:#10b981; } .associated { background:#f59e0b; }
-  .rec { font-size:11px; color:#d97706; margin-left:6px; }
+/* Hierarchy zoom */
+#tree { --hierarchy-scale:1; }
+#tree .node { min-width:calc(170px * var(--hierarchy-scale)); max-width:calc(270px * var(--hierarchy-scale)); padding:calc(10px * var(--hierarchy-scale)) calc(13px * var(--hierarchy-scale)); }
+#tree .node .name { font-size:calc(13px * var(--hierarchy-scale)); }
+#tree .node .sig { font-size:calc(11px * var(--hierarchy-scale)); }
+#tree .badge { font-size:calc(9px * var(--hierarchy-scale)); }
+#tree .tree li { padding-left:calc(9px * var(--hierarchy-scale)); padding-right:calc(9px * var(--hierarchy-scale)); }
 
-  /* restore dialog */
-  dialog { background:var(--panel); color:var(--fg); border:1px solid var(--border); border-radius:10px;
-           padding:18px; width:min(520px,92vw); }
-  dialog::backdrop { background:rgba(0,0,0,.5); }
-  dialog h2 { margin:0 0 4px; font-size:17px; }
-  dialog p { margin:0 0 12px; color:var(--muted); }
-  .saved { display:block; width:100%; text-align:left; margin-bottom:8px; padding:10px; cursor:pointer;
-           background:var(--bg); color:var(--fg); border:1px solid var(--border); border-radius:6px;
-           font:12px/1.4 ui-monospace,Menlo,Consolas,monospace; white-space:pre; overflow:hidden;
-           text-overflow:ellipsis; max-height:64px; }
-  .saved:hover { border-color:var(--accent); }
+/* Output */
+.view { flex:1; min-height:0; overflow:auto; padding:14px 16px; background:var(--bg); }
+.view[hidden] { display:none; }
+.view:not([hidden]) { animation:fade .25s ease; }
+@keyframes fade { from { opacity:0; } to { opacity:1; } }
+pre#out { margin:0; white-space:pre-wrap; word-break:break-word; font:14px/1.5 ui-monospace,"SF Mono",Menlo,Consolas,monospace; }
+pre#out.fail { color:var(--danger); }
+#parseError { color:var(--danger); white-space:pre-wrap; margin-bottom:10px; }
+.placeholder { color:var(--muted); }
 
-  @media (max-width: 800px) {
-    main { grid-template-columns:1fr; grid-template-rows:1fr 1fr; }
-    .pane + .pane { border-left:0; border-top:1px solid var(--border); }
-  }
+/* Function hierarchy */
+h3 { margin:22px 0 12px; font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.1em; }
+h3:first-child { margin-top:0; }
+.forest { display:flex; flex-wrap:wrap; gap:26px; align-items:flex-start; }
+.tree { width:max-content; margin:0 auto; }
+.tree ul { display:flex; justify-content:center; margin:0; padding:24px 0 0; list-style:none; position:relative; }
+.tree li { position:relative; padding:24px 9px 0; text-align:center; list-style:none; }
+.tree li::before, .tree li::after { content:""; position:absolute; top:0; right:50%; width:50%; height:24px; border-top:1px solid var(--gutter); opacity:.65; }
+.tree li::after { right:auto; left:50%; border-left:1px solid var(--gutter); }
+.tree li:only-child::before, .tree li:only-child::after { display:none; }
+.tree li:only-child { padding-top:0; }
+.tree li:first-child::before, .tree li:last-child::after { border:0 none; }
+.tree li:last-child::before { border-right:1px solid var(--gutter); border-radius:0 7px 0 0; }
+.tree li:first-child::after { border-radius:7px 0 0 0; }
+.tree ul ul::before { content:""; position:absolute; top:0; left:50%; height:24px; border-left:1px solid var(--gutter); opacity:.65; }
+.tree > ul { padding-top:0; }
+.tree > ul > li { padding-top:0; }
+.tree > ul > li::before, .tree > ul > li::after { display:none; }
+.tree li.collapsed > ul { display:none; }
+.node { --kind:#8292a8; display:inline-block; position:relative; z-index:1; min-width:170px; max-width:270px; text-align:left; background:linear-gradient(145deg, color-mix(in srgb, var(--kind) 13%, var(--panel)), var(--panel) 72%); border:1px solid color-mix(in srgb, var(--kind) 58%, var(--border)); border-left:4px solid var(--kind); border-radius:11px; padding:10px 13px; box-shadow:0 5px 16px rgba(0,0,0,.12); animation:pop .45s cubic-bezier(.2,.8,.2,1) both; transition:border-color .2s, transform .2s, box-shadow .2s; }
+.node.kind-standalone { --kind:#5798ff; }
+.node.kind-method { --kind:#32c995; }
+.node.kind-associated { --kind:#f2b84b; }
+.node.has-kids { cursor:pointer; }
+.node.has-kids:hover { border-color:var(--kind); transform:translateY(-3px); box-shadow:0 9px 22px color-mix(in srgb, var(--kind) 20%, transparent); }
+.node.entry { box-shadow:0 0 0 2px color-mix(in srgb, var(--kind) 24%, transparent), 0 7px 20px rgba(0,0,0,.16); }
+.node .top { display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
+.node .name { font:650 13px ui-monospace,"SF Mono",Menlo,Consolas,monospace; word-break:break-word; }
+.node .sig { margin-top:6px; font:11px/1.5 ui-monospace,"SF Mono",Menlo,Consolas,monospace; color:var(--muted); word-break:break-word; }
+.badge { font-size:9px; font-weight:750; letter-spacing:.045em; text-transform:uppercase; padding:3px 7px; border-radius:5px; color:#101820; background:var(--kind); }
+.badge.standalone { background:#5798ff; color:#07182f; }
+.badge.method { background:#32c995; color:#06271c; }
+.badge.associated { background:#f2b84b; color:#302006; }
+.rec { font-size:10px; color:#e6a23c; }
+.more { font-size:10px; color:var(--muted); margin-left:auto; padding-left:5px; }
+@keyframes pop { from { opacity:0; transform:translateY(9px) scale(.97); } to { opacity:1; transform:none; } }
+
+/* Restore dialog */
+dialog { background:var(--panel); color:var(--fg); border:1px solid var(--border); border-radius:10px; padding:18px; width:min(520px,92vw); }
+dialog::backdrop { background:rgba(0,0,0,.5); }
+dialog h2 { margin:0 0 4px; font-size:17px; }
+dialog p { margin:0 0 12px; color:var(--muted); }
+.saved { display:block; width:100%; text-align:left; margin-bottom:8px; padding:10px; cursor:pointer; background:var(--bg); color:var(--fg); border:1px solid var(--border); border-radius:6px; font:12px/1.4 ui-monospace,Menlo,Consolas,monospace; white-space:pre; overflow:hidden; text-overflow:ellipsis; max-height:64px; }
+.saved:hover { border-color:var(--accent); }
+
+@media (max-width: 800px) {
+header { gap:8px; }
+.brand { font-size:14px; }
+main { grid-template-columns:1fr; grid-template-rows:minmax(220px,var(--top-pane, 1fr)) 8px minmax(220px,1fr); }
+.pane + .pane { border-left:0; border-top:0; }
+.splitter { cursor:row-resize; }
+.splitter::after { width:42px; height:3px; }
+body.resizing { cursor:row-resize; }
+.editor-tools { gap:4px; }
+.font-label { display:none; }
+.font-select { max-width:104px; }
+}
+@media (prefers-reduced-motion: reduce) {
+*, *::before, *::after { animation:none !important; transition:none !important; }
+}
 </style>
 </head>
 <body>
-
 <header>
-  <div class="brand"><span class="logo">fn</span> Rust Online Compiler</div>
-  <div class="menu">
-    <button class="icon-btn" id="menuBtn" title="Menu">&#8942;</button>
-    <div class="dropdown" id="dropdown">
-      <button id="themeBtn">Light mode</button>
-      <button id="restoreBtn">Restore code</button>
-      <button id="downloadBtn">Download</button>
-    </div>
-  </div>
+<div class="brand"><span>Rust Online Compiler</span></div>
+<div class="hero" aria-hidden="true">
+<svg class="wave-art" viewBox="0 0 900 120" preserveAspectRatio="none">
+<defs>
+<linearGradient id="waveGradient" x1="0" y1="0" x2="1" y2="0">
+<stop offset="0" stop-color="#0876c8"/><stop offset=".48" stop-color="#19d5d0"/><stop offset="1" stop-color="#0876c8"/>
+</linearGradient>
+<filter id="waveGlow" x="-30%" y="-100%" width="160%" height="300%">
+<feGaussianBlur stdDeviation="3.5" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+</filter>
+</defs>
+<g class="wave-fine">
+<path class="wave-line" d="M-30 62 C80 15 130 110 245 62 S410 18 520 62 S700 105 930 48"/>
+<path class="wave-line" d="M-30 68 C90 25 140 100 255 68 S420 25 530 68 S710 98 930 55"/>
+<path class="wave-line" d="M-30 75 C90 35 150 92 265 75 S430 32 540 75 S720 90 930 62"/>
+<path class="wave-line" d="M-30 82 C100 45 160 86 275 82 S440 40 550 82 S730 84 930 69"/>
+</g>
+<path class="wave-line wave-soft" d="M-30 55 C90 5 150 112 275 62 S430 12 555 67 S735 108 930 42"/>
+<path class="wave-line wave-second" d="M-30 72 C85 115 155 8 280 58 S435 112 560 60 S735 8 930 78"/>
+<path class="wave-line wave-main" d="M-30 64 C90 12 155 112 280 62 S435 12 560 64 S735 108 930 48"/>
+</svg>
+</div>
+<div class="menu">
+<button class="icon-btn" id="menuBtn" title="Menu">&#8942;</button>
+<div class="dropdown" id="dropdown">
+<button id="themeBtn">Light mode</button>
+<button id="restoreBtn">Restore code</button>
+<button id="downloadBtn">Download</button>
+</div>
+</div>
 </header>
-
 <main>
-  <!-- left: editor -->
-  <section class="pane">
-    <div class="tabbar">
-      <div class="tabs"><button class="tab active">main.rs</button></div>
-      <div class="actions">
-        <button class="btn" id="clear">Clear</button>
-        <button class="btn run" id="run">Run</button>
-      </div>
-    </div>
-    <div class="editor">
-      <div id="gutter">1</div>
-      <textarea id="code" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
-    </div>
-  </section>
-
-  <!-- right: output + hierarchy -->
-  <section class="pane">
-    <div class="tabbar">
-      <div class="tabs">
-        <button class="tab active" id="tabOut">Output</button>
-        <button class="tab" id="tabTree">Hierarchy</button>
-      </div>
-      <div class="actions" id="treeActions" hidden>
-        <button class="btn small" id="expand">Expand all</button>
-        <button class="btn small" id="collapse">Collapse all</button>
-      </div>
-    </div>
-    <div class="view" id="viewOut">
-      <pre id="out" class="placeholder">Click Run to compile and run your code.</pre>
-    </div>
-    <div class="view" id="viewTree" hidden>
-      <div id="parseError"></div>
-      <div id="tree"><span class="placeholder">Click Run to build the function hierarchy.</span></div>
-    </div>
-  </section>
+<section class="pane">
+<div class="tabbar">
+<div class="tabs"><button class="tab active">main.rs</button></div>
+<div class="actions editor-tools">
+<label class="font-label" for="fontFamily">Font</label>
+<select class="font-select" id="fontFamily" title="Editor font family">
+<option value="mono">Monospace</option>
+<option value="fira">Fira Code</option>
+<option value="consolas">Consolas</option>
+<option value="menlo">Menlo</option>
+<option value="courier">Courier New</option>
+<option value="system">System</option>
+</select>
+<button class="btn small" id="fontDown" title="Decrease editor font size">A−</button>
+<button class="btn small" id="fontUp" title="Increase editor font size">A+</button>
+<button class="btn" id="clear">Clear</button>
+<button class="btn run" id="run">Run</button>
+</div>
+</div>
+<div class="editor">
+<div id="gutter">1</div>
+<div class="codewrap">
+<pre id="hl" aria-hidden="true"></pre>
+<textarea id="code" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
+</div>
+</div>
+</section>
+<div class="splitter" id="splitter" role="separator" aria-label="Resize editor and output panels" aria-orientation="vertical" tabindex="0"></div>
+<section class="pane">
+<div class="tabbar">
+<div class="tabs">
+<button class="tab active" id="tabOut">Output</button>
+<button class="tab" id="tabTree">Hierarchy</button>
+</div>
+<div class="actions" id="treeActions" hidden>
+<button class="btn small" id="hierDown" title="Make hierarchy smaller">A−</button>
+<button class="btn small" id="hierUp" title="Make hierarchy larger">A+</button>
+<button class="btn small" id="expand">Expand all</button>
+<button class="btn small" id="collapse">Collapse all</button>
+</div>
+</div>
+<div class="view" id="viewOut">
+<pre id="out" class="placeholder">Click Run to compile and run your code.</pre>
+</div>
+<div class="view" id="viewTree" hidden>
+<div id="parseError"></div>
+<div id="tree"><span class="placeholder">Click Run to build the function hierarchy.</span></div>
+</div>
+</section>
 </main>
-
 <dialog id="restoreDlg">
-  <h2>Restore code</h2>
-  <p>Your last three programs are saved in this browser.</p>
-  <div id="savedList"></div>
-  <button class="btn" id="closeDlg">Close</button>
+<h2>Restore code</h2>
+<p>Your last three programs are saved in this browser.</p>
+<div id="savedList"></div>
+<button class="btn" id="closeDlg">Close</button>
 </dialog>
-
 <script>
 const $ = id => document.getElementById(id);
-
 const SAMPLE = `// Online Rust compiler
 // Write and run Rust here, then open the Hierarchy tab.
-
 struct Store {
-    items: Vec<String>,
+items: Vec<String>,
 }
-
 impl Store {
-    fn new() -> Self {
-        Self { items: Vec::new() }
-    }
-
-    fn add(&mut self, key: String) -> usize {
-        let label = format_key(&key);
-        self.items.push(label);
-        self.count()
-    }
-
-    fn count(&self) -> usize {
-        self.items.len()
-    }
+fn new() -> Self {
+Self { items: Vec::new() }
 }
-
+fn add(&mut self, key: String) -> usize {
+let label = format_key(&key);
+self.items.push(label);
+self.count()
+}
+fn count(&self) -> usize {
+self.items.len()
+}
+}
 fn format_key(key: &str) -> String {
-    key.to_uppercase()
+key.to_uppercase()
 }
-
 fn main() {
-    let mut s = Store::new();
-    let n = s.add("hello".to_string());
-    println!("Items: {}", n);
+let mut s = Store::new();
+let n = s.add("hello".to_string());
+println!("Items: {}", n);
 }
 `;
 
-/* ---------- storage helpers (safe if storage is blocked) ---------- */
+/* Storage */
 const store = {
-  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
-  set(k, v) { try { localStorage.setItem(k, v); } catch {} },
+get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+set(k, v) { try { localStorage.setItem(k, v); } catch {} },
 };
 
-/* ---------- theme ---------- */
+/* Theme */
 function setTheme(t) {
-  document.documentElement.dataset.theme = t;
-  $("themeBtn").textContent = t === "dark" ? "Light mode" : "Dark mode";
-  store.set("theme", t);
+document.documentElement.dataset.theme = t;
+$("themeBtn").textContent = t === "dark" ? "Light mode" : "Dark mode";
+store.set("theme", t);
 }
 setTheme(store.get("theme") || "dark");
 $("themeBtn").onclick = () => {
-  setTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
-  closeMenu();
+setTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
+closeMenu();
 };
 
-/* ---------- menu ---------- */
+/* Menu */
 const closeMenu = () => $("dropdown").classList.remove("open");
 $("menuBtn").onclick = e => { e.stopPropagation(); $("dropdown").classList.toggle("open"); };
 document.addEventListener("click", closeMenu);
 
-/* ---------- editor: line numbers, tab key, shortcuts ---------- */
-const code = $("code");
-function updateGutter() {
-  const n = code.value.split("\n").length;
-  let s = "";
-  for (let i = 1; i <= n; i++) s += i + "\n";
-  $("gutter").textContent = s;
-  $("gutter").scrollTop = code.scrollTop;
+/* Rust syntax highlighting */
+const KEYWORDS = new Set(("as async await break const continue crate dyn else enum extern false fn for if impl " +
+"in let loop match mod move mut pub ref return self Self static struct super trait true type unsafe use " +
+"where while").split(" "));
+const PRIMITIVES = new Set("i8 i16 i32 i64 i128 isize u8 u16 u32 u64 u128 usize f32 f64 bool char str".split(" "));
+const esc = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+// Token groups: comments, strings, characters/lifetimes, attributes, numbers, identifiers, macros
+const TOKEN = new RegExp(
+String.raw`(\/\/[^\n]*|\/\*[\s\S]*?(?:\*\/|$))` +
+String.raw`|(r(#*)"[\s\S]*?"\3|"(?:\\[\s\S]|[^"\\])*(?:"|$))` +
+String.raw`|('(?:\\.[^'\n]*|[^\\'\n])'|'[A-Za-z_]\w*)` +
+String.raw`|(#!?\[[^\]\n]*\])` +
+String.raw`|(\b(?:0x[\da-fA-F_]+|\d[\d_]*(?:\.\d[\d_]*)?(?:[eE][+-]?\d+)?)(?:[iu](?:8|16|32|64|128|size)|f32|f64)?\b)` +
+String.raw`|([A-Za-z_]\w*)(!(?!=))?`,
+"g"
+);
+
+function highlight(src) {
+let out = "", last = 0, m;
+TOKEN.lastIndex = 0;
+while ((m = TOKEN.exec(src))) {
+out += esc(src.slice(last, m.index));
+const t = m[0];
+let cls = null;
+if (m[1]) cls = "com";
+else if (m[2]) cls = "str";
+else if (m[4]) cls = t.endsWith("'") ? "str" : "life";
+else if (m[5]) cls = "attr";
+else if (m[6]) cls = "num";
+else if (m[7]) {
+if (m[8]) cls = "mac";
+else if (KEYWORDS.has(m[7])) cls = "kw";
+else if (PRIMITIVES.has(m[7]) || /^[A-Z]/.test(m[7])) cls = "type";
+else {
+let j = TOKEN.lastIndex;
+while (src[j] === " ") j++;
+if (src[j] === "(") cls = "fn";
 }
-code.addEventListener("input", updateGutter);
-code.addEventListener("scroll", () => { $("gutter").scrollTop = code.scrollTop; });
+}
+out += cls ? `<span class="t-${cls}">${esc(t)}</span>` : esc(t);
+last = TOKEN.lastIndex;
+}
+out += esc(src.slice(last));
+return out + "\n";
+}
+
+/* Editor font family and size */
+const code = $("code");
+const fontStacks = {
+mono: 'ui-monospace, "SF Mono", Menlo, Consolas, monospace',
+fira: '"Fira Code", "Cascadia Code", ui-monospace, monospace',
+consolas: 'Consolas, "Courier New", monospace',
+menlo: 'Menlo, Monaco, monospace',
+courier: '"Courier New", Courier, monospace',
+system: 'system-ui, sans-serif'
+};
+let editorSize = Number(store.get("editorSize")) || 14;
+let fontChoice = store.get("fontFamily") || "mono";
+
+function refresh() {
+$("hl").innerHTML = highlight(code.value);
+const n = code.value.split("\n").length;
+let s = "";
+for (let i = 1; i <= n; i++) s += i + "\n";
+$("gutter").textContent = s;
+syncScroll();
+}
+
+function applyEditorFont() {
+editorSize = Math.max(10, Math.min(24, editorSize));
+document.documentElement.style.setProperty("--editor-font", fontStacks[fontChoice] || fontStacks.mono);
+document.documentElement.style.setProperty("--editor-size", editorSize + "px");
+document.documentElement.style.setProperty("--editor-line", Math.round(editorSize * 1.43) + "px");
+$("fontFamily").value = fontChoice;
+store.set("editorSize", String(editorSize));
+store.set("fontFamily", fontChoice);
+refresh();
+}
+$("fontFamily").addEventListener("change", e => { fontChoice = e.target.value; applyEditorFont(); });
+$("fontUp").onclick = () => { editorSize += 1; applyEditorFont(); };
+$("fontDown").onclick = () => { editorSize -= 1; applyEditorFont(); };
+
+/* Resizable editor/output split */
+const splitter = $("splitter");
+const main = document.querySelector("main");
+let splitDragging = false;
+
+function setSplitFromPointer(e) {
+const rect = main.getBoundingClientRect();
+if (window.matchMedia("(max-width: 800px)").matches) {
+const pct = Math.max(25, Math.min(75, ((e.clientY - rect.top) / rect.height) * 100));
+main.style.setProperty("--top-pane", pct + "%");
+} else {
+const pct = Math.max(25, Math.min(75, ((e.clientX - rect.left) / rect.width) * 100));
+main.style.setProperty("--left-pane", pct + "%");
+}
+}
+
+splitter.addEventListener("pointerdown", e => {
+splitDragging = true;
+splitter.classList.add("dragging");
+document.body.classList.add("resizing");
+splitter.setPointerCapture(e.pointerId);
+setSplitFromPointer(e);
+});
+splitter.addEventListener("pointermove", e => { if (splitDragging) setSplitFromPointer(e); });
+function stopSplitDrag() {
+splitDragging = false;
+splitter.classList.remove("dragging");
+document.body.classList.remove("resizing");
+}
+splitter.addEventListener("pointerup", stopSplitDrag);
+splitter.addEventListener("pointercancel", stopSplitDrag);
+splitter.addEventListener("keydown", e => {
+if (!["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"].includes(e.key)) return;
+e.preventDefault();
+const mobile = window.matchMedia("(max-width: 800px)").matches;
+const prop = mobile ? "--top-pane" : "--left-pane";
+const current = parseFloat(getComputedStyle(main).getPropertyValue(prop)) || 50;
+const increase = mobile ? e.key === "ArrowDown" : e.key === "ArrowRight";
+const decrease = mobile ? e.key === "ArrowUp" : e.key === "ArrowLeft";
+if (increase || decrease) main.style.setProperty(prop, Math.max(25, Math.min(75, current + (increase ? 3 : -3))) + "%");
+});
+
+/* Hierarchy zoom */
+let hierarchyScale = Number(store.get("hierarchyScale")) || 1;
+function applyHierarchyScale() {
+hierarchyScale = Math.max(.7, Math.min(1.6, hierarchyScale));
+$("tree").style.setProperty("--hierarchy-scale", hierarchyScale);
+store.set("hierarchyScale", String(hierarchyScale));
+}
+$("hierUp").onclick = () => { hierarchyScale += .1; applyHierarchyScale(); };
+$("hierDown").onclick = () => { hierarchyScale -= .1; applyHierarchyScale(); };
+applyHierarchyScale();
+
+function syncScroll() {
+$("hl").scrollTop = code.scrollTop;
+$("hl").scrollLeft = code.scrollLeft;
+$("gutter").scrollTop = code.scrollTop;
+}
+code.addEventListener("input", () => { refresh(); store.set("draft", code.value); });
+code.addEventListener("scroll", syncScroll);
 code.addEventListener("keydown", e => {
-  if (e.key === "Tab") {
-    e.preventDefault();
-    const s = code.selectionStart, end = code.selectionEnd;
-    code.value = code.value.slice(0, s) + "    " + code.value.slice(end);
-    code.selectionStart = code.selectionEnd = s + 4;
-    updateGutter();
-  } else if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
-    e.preventDefault();
-    runCode();
-  }
+if (e.key === "Tab") {
+e.preventDefault();
+const s = code.selectionStart, end = code.selectionEnd;
+code.value = code.value.slice(0, s) + "    " + code.value.slice(end);
+code.selectionStart = code.selectionEnd = s + 4;
+refresh();
+store.set("draft", code.value);
+} else if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+e.preventDefault();
+runCode();
+}
 });
 code.value = store.get("draft") || SAMPLE;
-updateGutter();
-code.addEventListener("input", () => store.set("draft", code.value));
+applyEditorFont();
 
-$("clear").onclick = () => { code.value = ""; store.set("draft", ""); updateGutter(); code.focus(); };
+$("clear").onclick = () => { code.value = ""; store.set("draft", ""); refresh(); code.focus(); };
 
-/* ---------- tabs ---------- */
+/* Tabs */
 function showTab(name) {
-  const tree = name === "tree";
-  $("tabOut").classList.toggle("active", !tree);
-  $("tabTree").classList.toggle("active", tree);
-  $("viewOut").hidden = tree;
-  $("viewTree").hidden = !tree;
-  $("treeActions").hidden = !tree;
+const tree = name === "tree";
+$("tabOut").classList.toggle("active", !tree);
+$("tabTree").classList.toggle("active", tree);
+$("viewOut").hidden = tree;
+$("viewTree").hidden = !tree;
+$("treeActions").hidden = !tree;
 }
 $("tabOut").onclick = () => showTab("out");
 $("tabTree").onclick = () => showTab("tree");
-$("expand").onclick = () => document.querySelectorAll("details").forEach(d => d.open = true);
-$("collapse").onclick = () => document.querySelectorAll("details").forEach(d => d.open = false);
+$("expand").onclick = () => document.querySelectorAll("#tree li.collapsed").forEach(li => li.classList.remove("collapsed"));
+$("collapse").onclick = () => document.querySelectorAll("#tree li").forEach(li => {
+if (li.querySelector(":scope > ul")) li.classList.add("collapsed");
+});
 
-/* ---------- download / restore ---------- */
+/* Download and restore */
 $("downloadBtn").onclick = () => {
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob([code.value], { type: "text/plain" }));
-  a.download = "main.rs";
-  a.click();
-  URL.revokeObjectURL(a.href);
-  closeMenu();
+const a = document.createElement("a");
+a.href = URL.createObjectURL(new Blob([code.value], { type: "text/plain" }));
+a.download = "main.rs";
+a.click();
+URL.revokeObjectURL(a.href);
+closeMenu();
 };
 
 function loadSaved() {
-  try { return JSON.parse(store.get("history") || "[]"); } catch { return []; }
+try { return JSON.parse(store.get("history") || "[]"); } catch { return []; }
 }
 function saveToHistory(src) {
-  if (!src.trim()) return;
-  const list = loadSaved().filter(s => s !== src);
-  list.unshift(src);
-  store.set("history", JSON.stringify(list.slice(0, 3)));
+if (!src.trim()) return;
+const list = loadSaved().filter(s => s !== src);
+list.unshift(src);
+store.set("history", JSON.stringify(list.slice(0, 3)));
 }
+
 $("restoreBtn").onclick = () => {
-  closeMenu();
-  const list = loadSaved();
-  const box = $("savedList");
-  box.textContent = "";
-  if (!list.length) {
-    const p = document.createElement("p");
-    p.textContent = "Nothing saved yet. Programs are saved when you click Run.";
-    box.append(p);
-  }
-  for (const src of list) {
-    const b = document.createElement("button");
-    b.className = "saved";
-    b.textContent = src;
-    b.onclick = () => { code.value = src; store.set("draft", src); updateGutter(); $("restoreDlg").close(); };
-    box.append(b);
-  }
-  $("restoreDlg").showModal();
+closeMenu();
+const list = loadSaved();
+const box = $("savedList");
+box.textContent = "";
+if (!list.length) {
+const p = document.createElement("p");
+p.textContent = "Nothing saved yet. Programs are saved when you click Run.";
+box.append(p);
+}
+for (const src of list) {
+const b = document.createElement("button");
+b.className = "saved";
+b.textContent = src;
+b.onclick = () => { code.value = src; store.set("draft", src); refresh(); $("restoreDlg").close(); };
+box.append(b);
+}
+$("restoreDlg").showModal();
 };
 $("closeDlg").onclick = () => $("restoreDlg").close();
 
-/* ---------- run ---------- */
+/* Run */
 $("run").onclick = runCode;
-
 async function runCode() {
-  const btn = $("run");
-  btn.disabled = true;
-  btn.textContent = "Running...";
-  saveToHistory(code.value);
-
-  const out = $("out");
-  out.className = "placeholder";
-  out.textContent = "Compiling and running...";
-  showTab("out");
-  $("parseError").textContent = "";
-
-  try {
-    const res = await fetch("/run", { method: "POST", body: code.value });
-    if (!res.ok) { out.className = "fail"; out.textContent = await res.text(); return; }
-    const data = await res.json();
-
-    if (data.run_error) {
-      out.className = "fail";
-      out.textContent = data.run_error;
-    } else {
-      const r = data.run;
-      out.className = r.success ? "" : "fail";
-      out.textContent = (r.stdout || "") + (r.stderr ? (r.stdout ? "\n" : "") + r.stderr : "") || "(no output)";
-    }
-
-    $("parseError").textContent = data.parse_error || "";
-    $("tree").textContent = "";
-    if (data.hierarchy) draw(data.hierarchy);
-  } catch (e) {
-    out.className = "fail";
-    out.textContent = "Request failed: " + e.message;
-  } finally {
-    btn.disabled = false;
-    btn.textContent = "Run";
-  }
+const btn = $("run");
+btn.disabled = true;
+btn.textContent = "Running...";
+saveToHistory(code.value);
+const out = $("out");
+out.className = "placeholder";
+out.textContent = "Compiling and running...";
+showTab("out");
+$("parseError").textContent = "";
+try {
+const res = await fetch("/run", { method: "POST", body: code.value });
+if (!res.ok) { out.className = "fail"; out.textContent = await res.text(); return; }
+const data = await res.json();
+if (data.run_error) {
+out.className = "fail";
+out.textContent = data.run_error;
+} else {
+const r = data.run;
+out.className = r.success ? "" : "fail";
+out.textContent = (r.stdout || "") + (r.stderr ? (r.stdout ? "\n" : "") + r.stderr : "") || "(no output)";
+}
+$("parseError").textContent = data.parse_error || "";
+$("tree").textContent = "";
+if (data.hierarchy) draw(data.hierarchy);
+} catch (e) {
+out.className = "fail";
+out.textContent = "Request failed: " + e.message;
+} finally {
+btn.disabled = false;
+btn.textContent = "Run";
+}
 }
 
-/* ---------- hierarchy tree ---------- */
+/* Function hierarchy */
 function draw(data) {
-  const byId = new Map(data.functions.map(f => [f.id, f]));
-  const shown = new Set();
+const root = $("tree");
+if (!data.functions.length) {
+const p = document.createElement("span");
+p.className = "placeholder";
+p.textContent = "No functions found.";
+root.append(p);
+return;
+}
+const byId = new Map(data.functions.map(f => [f.id, f]));
+const shown = new Set();
+const isMain = f => f.name === "main" && f.owner === null;
+const entry = data.roots.map(i => byId.get(i)).filter(isMain);
+const unused = data.roots.map(i => byId.get(i)).filter(f => !isMain(f));
+forest("Entry point", entry, true);
+forest("Not called by anything", unused, false);
+const rest = data.functions.filter(f => !shown.has(f.id));
+forest("Only reachable through a call cycle", rest, false);
 
-  const isMain = f => f.name === "main" && f.owner === null;
-  const entry = data.roots.map(i => byId.get(i)).filter(isMain);
-  const unused = data.roots.map(i => byId.get(i)).filter(f => !isMain(f));
+function forest(title, fns, isEntry) {
+if (!fns.length) return;
+const sec = document.createElement("section");
+const h = document.createElement("h3");
+h.textContent = title;
+const row = document.createElement("div");
+row.className = "forest";
+for (const f of fns) {
+if (title.startsWith("Only") && shown.has(f.id)) continue;
+const tree = document.createElement("div");
+tree.className = "tree";
+const ul = document.createElement("ul");
+ul.append(node(f, new Set(), isEntry));
+tree.append(ul);
+row.append(tree);
+}
+sec.append(h, row);
+root.append(sec);
+}
 
-  if (!data.functions.length) {
-    const p = document.createElement("span");
-    p.className = "placeholder";
-    p.textContent = "No functions found.";
-    $("tree").append(p);
-    return;
-  }
+function node(f, path, isEntry) {
+shown.add(f.id);
+const li = document.createElement("li");
+const recursive = path.has(f.id);
+const kids = recursive ? [] : f.calls.map(id => byId.get(id));
+const box = document.createElement("div");
+box.className = "node kind-" + f.kind + (isEntry ? " entry" : "");
+box.style.animationDelay = (path.size * 0.09) + "s";
+box.append(label(f, recursive));
+li.append(box);
+if (kids.length) {
+box.classList.add("has-kids");
+const more = document.createElement("span");
+more.className = "more";
+more.textContent = kids.length + (kids.length === 1 ? " call" : " calls");
+box.querySelector(".top").append(more);
+box.onclick = () => li.classList.toggle("collapsed");
+const ul = document.createElement("ul");
+const next = new Set(path).add(f.id);
+for (const k of kids) ul.append(node(k, next, false));
+li.append(ul);
+}
+return li;
+}
 
-  section("Entry point", entry);
-  section("Not called by anything", unused);
-  const rest = data.functions.filter(f => !shown.has(f.id));
-  section("Only reachable through a call cycle", rest);
-
-  function section(title, fns) {
-    if (!fns.length) return;
-    const sec = document.createElement("section");
-    const h = document.createElement("h3");
-    h.textContent = title;
-    const ul = document.createElement("ul");
-    for (const f of fns) {
-      if (shown.has(f.id) && title.startsWith("Only")) continue;
-      ul.append(node(f, new Set()));
-    }
-    sec.append(h, ul);
-    $("tree").append(sec);
-  }
-
-  function node(f, path) {
-    shown.add(f.id);
-    const li = document.createElement("li");
-    const recursive = path.has(f.id);
-    const kids = recursive ? [] : f.calls.map(id => byId.get(id));
-
-    const head = document.createElement(kids.length ? "summary" : "div");
-    if (!kids.length) head.className = "leaf";
-    head.append(label(f));
-    if (recursive) {
-      const r = document.createElement("span");
-      r.className = "rec"; r.textContent = "\u21bb recursive";
-      head.append(r);
-    }
-
-    if (kids.length) {
-      const d = document.createElement("details");
-      d.open = path.size === 0;
-      const ul = document.createElement("ul");
-      const next = new Set(path).add(f.id);
-      for (const k of kids) ul.append(node(k, next));
-      d.append(head, ul);
-      li.append(d);
-    } else {
-      li.append(head);
-    }
-    return li;
-  }
-
-  function label(f) {
-    const wrap = document.createElement("span");
-    const b = document.createElement("span");
-    b.className = "badge " + f.kind; b.textContent = f.kind;
-    const c = document.createElement("code");
-    const params = f.params.map(p => p.name === "self" ? p.ty : `${p.name}: ${p.ty}`).join(", ");
-    c.textContent = (f.owner ? f.owner + "::" : "") + f.name + "(" + params + ")";
-    wrap.append(b, c);
-    if (f.return_type) {
-      const r = document.createElement("code");
-      r.className = "ret"; r.textContent = " \u2192 " + f.return_type;
-      wrap.append(r);
-    }
-    return wrap;
-  }
+function label(f, recursive) {
+const wrap = document.createElement("div");
+const top = document.createElement("div");
+top.className = "top";
+const b = document.createElement("span");
+b.className = "badge " + f.kind;
+b.textContent = f.kind;
+const name = document.createElement("span");
+name.className = "name";
+name.textContent = (f.owner ? f.owner + "::" : "") + f.name;
+top.append(b, name);
+if (recursive) {
+const r = document.createElement("span");
+r.className = "rec";
+r.textContent = "\u21bb recursive";
+top.append(r);
+}
+const sig = document.createElement("div");
+sig.className = "sig";
+const params = f.params.map(p => p.name === "self" ? p.ty : `${p.name}: ${p.ty}`).join(", ");
+sig.textContent = "(" + params + ")" + (f.return_type ? " \u2192 " + f.return_type : "");
+wrap.append(top, sig);
+return wrap;
+}
 }
 </script>
 </body>

@@ -13,6 +13,17 @@ impl hello{
     }
 }
 
+enum function{
+    Associated,
+    Standalone,
+    Method,
+}
+impl function{
+    fn hello(){
+        println!("kjfdvn");
+    }
+}
+
 fn main(){
     
 }
